@@ -1,0 +1,16 @@
+#commented out setenforce 0 as it is already shutoff in current redhat build and errors if ran
+- name: Kubernetes prereq
+  become: True
+  become_method: sudo
+  shell:
+    cmd: "{{ execute }}"
+  loop:
+    - source /etc/profile.d/bash_completion.sh
+    - source <(kubectl completion bash)
+    - echo "source <(kubectl completion bash)" >> ~/.bashrc
+    - echo "export KUBECONFIG=/etc/kubernetes/admin.conf" >> ~/.bashrc
+    - echo "alias k=kubectl"  >> ~/.bashrc
+    - echo "complete -o default -F __start_kubectl k"  >> ~/.bashrc
+  loop_control:
+    loop_var: execute
+

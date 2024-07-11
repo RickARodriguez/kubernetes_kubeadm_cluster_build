@@ -1,0 +1,175 @@
+---
+# tasks file for k8_mgmt
+
+#Download files from URL if needed
+- name: download files from url
+  when: file_movement is defined and files.download is defined and files.download == True
+  get_url:
+    url: "{{ files.download_url }}"
+    headers:
+      Authorization: Bearer {{ files.auth_token }}
+    dest: "{{ files.download_dir }}/"
+  loop: "{{ file_movement }}"
+  loop_control:
+    loop_var: files
+  tags:
+    - k8_prereq
+    - file_move
+
+#Create directory to move files to if needed
+- name: create directories if needed
+  when: file_movement is defined and files.create is defined and files.create == True
+  become: True
+  become_method: sudo
+  file:
+    path: "{{ files.dest_dir }}"
+    state: directory
+    mode: 0755
+  loop: "{{ file_movement }}"
+  loop_control:
+    loop_var: files
+  tags:
+    - k8_prereq
+    - file_move
+
+#Extract zip file if needed
+- name: extract files as needed
+  when: file_movement is defined and files.extract is defined and files.extract == True 
+  unarchive:
+    src: "{{ files.src }}/{{ files.filename }}"
+    dest: "{{ files.dest_dir }}"
+    remote_src: "{{ files.remote_src }}"
+    owner: "{{ files.owner }}"
+    group: "{{ files.group }}"
+  loop: "{{ file_movement }}"
+  loop_control:
+    loop_var: files
+  tags:
+    - k8_prereq
+    - file_move
+
+
+#Move files to host if needed
+- name: copy required files to host
+  when: file_movement is defined and files.src is defined and files.filename is defined and files.mode is defined
+  copy:
+    src: "{{ files.src }}"
+    dest: "{{ files.dest_dir }}/{{ files.filename }}"
+    mode: "{{ files.mode }}"
+  loop: "{{ file_movement }}"
+  loop_control:
+    loop_var: files
+  tags:
+    - k8_prereq
+    - file_move
+
+#Move files to host if needed
+- name: Template required files to host
+  when: file_movement is defined and files.src is defined and files.filename is defined and files.mode is defined and files.templating is defined and files.templating == True
+  template:
+    src: "{{ files.src }}"
+    dest: "{{ files.dest_dir }}/{{ files.filename }}"
+    mode: "{{ files.mode }}"
+  loop: "{{ file_movement }}"
+  loop_control:
+    loop_var: files
+  tags:
+    - k8_prereq
+    - file_move
+
+# Install packages to support app
+# Install Utilities
+- name: Install common utilities
+  when: cntr_host_packages is defined
+  dnf: 
+    name: "{{ item }}"
+    state: present
+    update_cache: yes
+  with_items: "{{ cntr_host_packages }}"
+  tags:
+    - k8_prereq
+
+- name: pip install kubernetes python requirement on first control plane node
+  when: inventory_hostname in groups[cp_group]
+  pip:
+    name:
+      - kubernetes
+  tags:
+    - k8_prereq
+
+#Network Setup
+- name: Setup network prereq
+  become: True
+  become_method: sudo
+  shell:
+    cmd: "{{ execute }}"
+  loop:
+    - modprobe overlay
+    - modprobe br_netfilter
+    - sysctl --system
+  loop_control:
+    loop_var: execute
+  tags:
+    - k8_prereq
+
+#Reboot after network setup
+- name: "Reboot the machine (Wait for 60 seconds)"
+  become: true
+  reboot:
+    reboot_timeout: "60"
+  tags:
+    - k8_prereq
+
+#Containerd Setup Service
+- name: Setup Containerd Service and install runc
+  become: True
+  become_method: sudo
+  shell:
+    cmd: "{{ execute }}"
+  loop:
+    - systemctl daemon-reload
+    - systemctl enable --now containerd
+    - install -m 755 /tmp/runc.amd64 /usr/local/sbin/runc
+  loop_control:
+    loop_var: execute
+  tags:
+    - k8_prereq
+
+#Run script to setup crictl
+- name: Run script to install crictl
+  ansible.builtin.script: files/k8/host_setup/install_crictrl.sh
+  tags:
+    - k8_prereq
+
+#Shutoff swap for kubernetes
+#commented out setenforce 0 as it is already shutoff in current redhat build and errors if ran
+- name: Kubernetes prereq
+  become: True
+  become_method: sudo
+  shell:
+    cmd: "{{ execute }}"
+  loop:
+    - swapoff -a
+    - sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+    #- setenforce 0
+    - sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
+  loop_control:
+    loop_var: execute
+  tags:
+    - k8_prereq
+
+#Install kubernetes using /etc/yum.repos.d/kubernetes.repo pointed to 1.30
+- name: Install kubernetes based on current sub-version
+  become: True
+  become_method: sudo
+  shell:
+    cmd: "{{ execute }}"
+  loop:
+    - yum install -y kubelet-{{ k8_kubeadm_install_version }}  kubeadm-{{ k8_kubeadm_install_version }}  kubectl-{{ k8_kubeadm_install_version }} --disableexcludes=kubernetes
+    - systemctl enable --now kubelet
+  loop_control:
+    loop_var: execute
+  tags:
+    - k8_install
+
+

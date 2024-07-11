@@ -1,0 +1,101 @@
+k8_version: "v1.30"
+cp_group: "controlplane"
+wk_group: "worker"
+status_file: "files/k8/host_setup/installation_progress"
+lock_file: "files/k8/host_setup/control_plane.lock"
+kube_config: "/etc/kubernetes/admin.conf"
+k8_kubeadm_install_version: "1.30.2-150500.1.1"
+k8_api_server_url: "{{ appsettings['api_server_vip'][env] }}"
+k8_api_server_bind_port: "{{ appsettings['api_server_bind_port'][env] }}"
+k8_pod_cidr_private_network: "{{ appsettings['pod_cidr_private_network'][env] }}"
+k8_worker_join_token: "{{ k8_secrets['worker_token'][env] }}"
+k8_worker_token_ca_cert_hash: "{{ k8_secrets['worker_token_ca_cert_hash'][env] }}"
+
+
+#To read in dynamic vars this definition can not be included in appsettings
+file_movement:
+  - src: "{{ appsettings['host_setup_files_dir'] }}/99-kubernetes-cri.conf"
+    dest_dir: "/etc/sysctl.d/"
+    filename: "99-kubernetes-cri.conf"
+    mode: 644
+  - src: "{{ appsettings['host_setup_files_dir'] }}/k8s.conf"
+    dest_dir: "/etc/sysctl.d/"
+    filename: "k8s.conf"
+    mode: 644
+  - src: "{{ appsettings['host_setup_files_dir'] }}/containerd.conf"
+    dest_dir: "/etc/modules-load.d/"
+    filename: "containerd.conf"
+    mode: 644
+  - src: "{{ appsettings['host_setup_files_dir'] }}/containerd.service"
+    dest_dir: "/usr/local/lib/systemd/system/"
+    filename: "containerd.service"
+    mode: 644
+    create: True
+  - src: "{{ appsettings['host_setup_files_dir'] }}/config.toml"
+    dest_dir: "/etc/containerd"
+    filename: "config.toml"
+    mode: 644
+    create: True
+  - src: "{{ appsettings['host_setup_template_dir'] }}/kubernetes.repo"
+    dest_dir: "/etc/yum.repos.d/"
+    filename: "kubernetes.repo"
+    mode: 644
+    templating: True
+  - src: "{{ appsettings['host_download_dir'] }}"
+    dest_dir: "/usr/local"
+    filename: "containerd-1.7.15-linux-amd64.tar.gz"
+    remote_src: True
+    extract: True
+    download_url: "{{ appsettings['cni_plugin_url'] }}"
+    download_dir: "{{ appsettings['host_download_dir'] }}"
+    download: True
+    owner: root
+    group: root
+    auth_token: "{{ ansible_token }}"
+  - src: "{{ appsettings['host_download_dir'] }}"
+    dest_dir: "/opt/cni/bin"
+    filename: "cni-plugins-linux-amd64-v1.5.1.tgz"
+    remote_src: True
+    create: True
+    extract: True
+    download_url: "{{ appsettings['containerd_url'] }}"
+    download_dir: "{{ appsettings['host_download_dir'] }}"
+    download: True
+    owner: root
+    group: root
+    auth_token: "{{ ansible_token }}"
+  - src: "{{ appsettings['host_download_dir'] }}"
+    dest_dir: ""
+    filename: "runc.amd64"
+    remote_src: True
+    download_url: "{{ appsettings['runc_url'] }}"
+    download_dir: "{{ appsettings['host_download_dir'] }}"
+    download: True
+    owner: root
+    group: root
+    auth_token: "{{ ansible_token }}"
+
+appsettings:
+  host_setup_files_dir: "files/k8/host_setup"
+  host_setup_template_dir: "templates/k8/host_setup"
+  host_download_dir: "/tmp"
+  cni_plugin_url: https://ARTIFACT_SOURCE/k8_host_setup/cni-plugins-linux-amd64-v1.5.1.tgz
+  containerd_url: https://ARTIFACT_SOURCE/k8_host_setup/containerd-1.7.15-linux-amd64.tar.gz
+  runc_url: https://ARTIFACT_SOURCE/k8_host_setup/runc.amd64
+  container_host_packages:
+  - bash-completion
+  api_server_vip:
+    qa: qa-k8-controlplane.kube.com:443
+    pa: pa-k8-controlplane.kube.com:443
+    dr: k8-controlplane.kube.com:443
+    prod: k8-controlplane.kube.com:443
+  api_server_bind_port:
+    qa: 443
+    pa: 443
+    dr: 443
+    prod: 443
+  pod_cidr_private_network:
+    qa: "10.244.0.0/16"
+    pa: "10.244.0.0/16"
+    dr: "10.244.0.0/16"
+    prod: "10.244.0.0/16"

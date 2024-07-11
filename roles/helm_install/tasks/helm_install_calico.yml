@@ -1,0 +1,29 @@
+- name: Add Calico Chart Repo to helm
+  when: inventory_hostname == groups[cp_group][0]
+  kubernetes.core.helm_repository:
+    name: projectcalico
+    repo_url: https://docs.tigera.io/calico/charts
+
+- name: Helm Chart install Calico CNI
+  when: inventory_hostname == groups[cp_group][0]
+  kubernetes.core.helm:
+    kubeconfig: "{{ kube_config }}"
+    name: calico
+    chart_ref: projectcalico/tigera-operator
+    reset_values: false
+    create_namespace: true
+    chart_version: v3.28.0
+    release_namespace: tigera-operator
+    values: "{{ lookup('template', 'templates/k8/host_setup/calico_helm_values.yaml') | from_yaml }}"
+
+- name: Wait for Calico CNI to be created in namespace calico-system
+  when: inventory_hostname == groups[cp_group][0]
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ kube_config }}"
+    namespace: calico-system
+    kind: Pod
+    wait: yes
+    wait_sleep: 10
+    wait_timeout: 360
+  register: cni_up
+

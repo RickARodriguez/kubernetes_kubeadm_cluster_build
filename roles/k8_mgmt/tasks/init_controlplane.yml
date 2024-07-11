@@ -1,0 +1,40 @@
+#initialize the first control plane node in the kubernetes cluster
+- name: Kubernetes initialize first control plane node
+  become: True
+  become_method: sudo
+  when: inventory_hostname == groups[cp_group][0]
+  shell:
+    cmd: "{{ execute }}"
+  loop:
+    - kubeadm  init --control-plane-endpoint "{{ k8_api_server_url }}" --upload-certs --apiserver-bind-port {{ k8_api_server_bind_port }} --pod-network-cidr {{ k8_pod_cidr_private_network }}
+  loop_control:
+    loop_var: execute
+  register: k8_initialize_output
+
+- name: Write output of Kubernetes init
+  when: inventory_hostname == groups[cp_group][0]
+  copy:
+    content: "{{ k8_initialize_output['results'][0]['stdout'] }}"
+    dest: files/k8/host_setup/init_output
+  delegate_to: localhost
+
+- name: Get join string from init_output
+  when: inventory_hostname == groups[cp_group][0]
+  shell: cat /etc/ansible/files/k8/host_setup/init_output  | grep -A2  -m 1 "kubeadm join" | tr -d '\\\n'
+  register: controlplane_join_command
+  delegate_to: localhost
+
+- name: Join code added to installation status file
+  when: inventory_hostname == groups[cp_group][0] and (controlplane_join_command.stdout | length > 0)
+  lineinfile:
+    line: "{{ controlplane_join_command.stdout }}"
+    path: "{{ status_file }}"
+  delegate_to: localhost
+
+- name: Log primary control plane node completion to installation status file
+  when: inventory_hostname == groups[cp_group][0] and (controlplane_join_command.stdout | length > 0)
+  lineinfile:
+    line: "{{ inventory_hostname }} control_plane_done"
+    path: "{{ status_file }}"
+  delegate_to: localhost
+

@@ -1,0 +1,7 @@
+---
+# defaults file for helm_install
+helm_version: 'v3.15.2'
+helm_platform: linux
+helm_arch: amd64
+helm_repo_path: "https://get.helm.sh"
+helm_bin_path: /usr/bin/helm

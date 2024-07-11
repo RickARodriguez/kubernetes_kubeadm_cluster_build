@@ -1,0 +1,11 @@
+installation:
+  enabled: true
+  cni:
+    type: Calico
+  calicoNetwork:
+    bgp: Disabled
+    ipPools:
+      - name: default-pod-priv-net
+        cidr: {{ k8_pod_cidr_private_network }}
+        encapsulation: VXLANCrossSubnet
+        blockSize: 24
