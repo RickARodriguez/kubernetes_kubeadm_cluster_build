@@ -34,8 +34,7 @@
   register: cp_nodes
 
 - name: Confirm all control plane nodes joined cluster
-  when: inventory_hostname in groups[cp_group] and inventory_hostname != groups[cp_group][0]
-  when: (cp_nodes['resources'] | length) == (groups[cp_group] | length)
+  when: inventory_hostname in groups[cp_group] and inventory_hostname != groups[cp_group][0] and (cp_nodes['resources'] | length) == (groups[cp_group] | length)
   file:
     path: "{{ lock_file }}"
     state: absent
