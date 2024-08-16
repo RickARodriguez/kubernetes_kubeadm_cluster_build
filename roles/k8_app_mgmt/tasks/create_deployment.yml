@@ -1,0 +1,13 @@
+---
+- name: Create default deployment
+  kubernetes.core.k8s:
+    state: present
+    template:
+    - path: "deployments/default_deployment.yml"
+
+
+#- name: test template
+#  template:
+#    src: "deployments/default_deployment.yml"
+#    dest: /tmp/k8_test_deployment.yml
+#  delegate_to: localhost

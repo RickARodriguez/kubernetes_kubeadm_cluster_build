@@ -1,0 +1,29 @@
+- name: check if F5 BigIP Ctrl chart inside f5cis-system namespace already
+  when: inventory_hostname == groups[cp_group][0]
+  kubernetes.core.helm_info:
+    name: f5-bigip-ctlr
+    release_namespace: "{{ f5cis_namespace }}"
+  register: f5_bigip_ctlr_installed
+
+- name: DEBUG 
+  when: inventory_hostname == groups[cp_group][0]
+  debug:
+    msg: "{{ f5_bigip_ctlr_installed }}"
+
+- name: Add F5 BigIP Ctrl Chart Repo to helm
+  when: inventory_hostname == groups[cp_group][0]
+  kubernetes.core.helm_repository:
+    name: f5-stable
+    repo_url: https://f5networks.github.io/charts/stable
+
+- name: Helm Chart install F5 BigIP Ctlr CIS
+  when: inventory_hostname == groups[cp_group][0] and f5_bigip_ctlr_installed['status'] is not defined
+  kubernetes.core.helm:
+    name: f5-bigip-ctlr
+    chart_ref: f5-stable/f5-bigip-ctlr
+    reset_values: false
+    create_namespace: false
+    chart_version: 0.0.31
+    release_namespace: "{{ f5cis_namespace }}"
+    values: "{{ lookup('template', 'f5cis_vars.yml') | from_yaml }}"
+

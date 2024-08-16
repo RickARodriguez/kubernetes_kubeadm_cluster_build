@@ -1,0 +1,28 @@
+- name: check if Prometheus chart inside monitoring namespace already
+  when: inventory_hostname == groups[cp_group][0]
+  kubernetes.core.helm_info:
+    name: prometheus
+    release_namespace: "{{ prometheus_namespace }}"
+  register: prometheus_installed
+
+- name: 
+  when: inventory_hostname == groups[cp_group][0]
+  debug:
+    msg: "{{ prometheus_installed }}"
+
+- name: Add Prometheus Chart Repo to helm
+  when: inventory_hostname == groups[cp_group][0]
+  kubernetes.core.helm_repository:
+    name: prometheus-community
+    repo_url: https://prometheus-community.github.io/helm-charts
+
+- name: Helm Chart install Prometheus
+  when: inventory_hostname == groups[cp_group][0] and prometheus_installed['status'] is not defined
+  kubernetes.core.helm:
+    name: prometheus
+    chart_ref: prometheus-community/prometheus
+    reset_values: false
+    create_namespace: true
+    chart_version: 25.24.0
+    release_namespace: "{{ prometheus_namespace }}"
+    values: "{{ lookup('template', 'prometheus_temp_vars.yml') | from_yaml }}"

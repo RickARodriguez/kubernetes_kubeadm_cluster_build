@@ -1,0 +1,8 @@
+---
+- name: Create default configmap 
+  kubernetes.core.k8s:
+    state: present
+    template:
+    - path: "service/default_service_nodeport.yml"
+
+

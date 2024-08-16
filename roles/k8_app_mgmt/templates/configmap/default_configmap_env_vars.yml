@@ -1,0 +1,12 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ configmap_name }}
+  namespace: {{ app_namespace }}
+data:
+{% if container_app_env_variables is defined %}
+{% for cntr_app_keys, cntr_app_vars in container_app_env_variables.items() %}
+  {{ cntr_app_keys}}: {{ cntr_app_vars }}
+{% endfor %}
+{% endif %}

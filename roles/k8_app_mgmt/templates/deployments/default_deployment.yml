@@ -1,0 +1,49 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ k8_cntr_name }}
+  namespace: {{ app_namespace }}
+spec:
+  replicas: {{ no_of_replicas }}
+  selector:
+    matchLabels:
+      app: {{ k8_cntr_name }}
+  template:
+    metadata:
+      labels:
+        app: {{ k8_cntr_name }}
+    spec:
+      containers:
+      - name: {{ k8_cntr_name }}
+        image: {{ cntr_image }}
+        volumeMounts:
+        - name: app-logging
+          mountPath: /var/log/application
+        ports:
+        - containerPort: {{ cntr_ps_port }}
+{% if ctnr_command_variable is defined %}
+        args: [{{ ctnr_command_variable["command"].split(" ")|map("to_json")|join(", ") }}]
+{% endif %}
+{% if configmap_name is defined %}
+        envFrom:
+        - configMapRef:
+            name: {{ configmap_name }}
+{% endif %}
+{% if node_affinity is defined %}
+      affinity:
+        nodeAffinity:
+         requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+{% for affinity in node_affinity.required %}
+              - key: {{ affinity['key'] }}
+                operator: {{ affinity['operator'] }}
+                values: {{ affinity['values'] }}
+{% endfor %}
+{% endif %}
+      volumes:
+        - name: app-logging
+          emptyDir: {}
+      imagePullSecrets:
+      - name: dmsartifactory

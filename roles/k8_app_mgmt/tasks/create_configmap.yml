@@ -1,0 +1,6 @@
+---
+- name: Create default configmap 
+  kubernetes.core.k8s:
+    state: present
+    template:
+    - path: "configmap/default_configmap_env_vars.yml"

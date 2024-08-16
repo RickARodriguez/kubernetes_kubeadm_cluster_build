@@ -1,0 +1,18 @@
+installation:
+  enabled: true
+  serviceCIDRs: ['{{ k8_service_cidr_network }}']
+  cni:
+    type: Calico
+  calicoNetwork:
+    bgp: Disabled
+    ipPools:
+      - name: "default-pod-priv-net"
+        cidr: "{{ k8_pod_cidr_private_network }}"
+        encapsulation: VXLAN
+        blockSize: 24
+        nodeSelector: "topology.kubernetes.io/network == 'private'"
+      - name: "default-pod-pub-net"
+        cidr: "{{ k8_pod_cidr_public_network }}"
+        encapsulation: VXLAN
+        blockSize: 24
+        nodeSelector: "topology.kubernetes.io/network == 'public'"

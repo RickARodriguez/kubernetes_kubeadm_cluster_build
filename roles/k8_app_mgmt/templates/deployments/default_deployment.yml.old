@@ -1,0 +1,26 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ appname }}
+  namespace: {{ app_namespace }}
+spec:
+  replicas: {{ no_of_replicas }}
+  selector:
+    matchLabels:
+      app: {{ appname }}
+  template:
+    metadata:
+      labels:
+        app: {{ appname }}
+    spec:
+      containers:
+      - name: {{ cntr_name }}
+        image: {{ cntr_image }}
+        ports:
+        - containerPort: {{ cntr_ps_port }}
+#        envFrom:
+#        - configMapRef:
+#            name: {{ configmap_name }}
+      imagePullSecrets:
+      - name: dmsartifactory

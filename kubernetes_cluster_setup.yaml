@@ -1,0 +1,235 @@
+---
+- hosts: 'kubernetes'
+  gather_facts: True
+  become: True
+  tasks:
+    - name: Build K8 Cluster
+      block:
+
+        - name: Touch lock file
+          when: inventory_hostname == groups[cp_group][0]
+          file:
+            path: "{{ lock_file }}"
+            state: touch
+          delegate_to: localhost
+
+        # Create installation progress file
+        - name: Touch installation status file
+          when: inventory_hostname == groups[cp_group][0]
+          copy:
+            content: ""
+            dest: "{{ status_file }}"
+          delegate_to: localhost
+
+        - name: Install All PreReqs on all hosts
+          include_role: 
+            name: k8_mgmt
+
+        - name: Initialize Kubernetes on first control plane node
+          when: inventory_hostname == groups[cp_group][0]
+          import_role: 
+            name: k8_mgmt
+            tasks_from: init_controlplane
+
+        - name: Setup profiles on control plane nodes
+          when: inventory_hostname == groups[cp_group][0]
+          import_role: 
+            name: k8_mgmt
+            tasks_from: controlplane_profile_config
+
+        - name: Install helm on first control plane node
+          when: inventory_hostname == groups[cp_group][0]
+          include_role: 
+            name: helm_install
+
+        - name: Create namespace for Flannel CNI
+          when: inventory_hostname == groups[cp_group][0]
+          include_role: 
+            name: k8_app_mgmt
+            tasks_from: create_namespace
+          vars:
+            k8_namespace: "{{ flannel_namespace }}"
+
+        - name: Apply flannel labels
+          when: inventory_hostname == groups[cp_group][0]
+          include_role:
+            name: k8_mgmt
+            tasks_from: apply_labels.yml
+          vars:
+            label_input: "{{ flannel_label_input }}"
+
+        - name: Apply node labels
+          when: inventory_hostname == groups[cp_group][0]
+          include_role:
+            name: k8_mgmt
+            tasks_from: apply_node_labels.yml
+
+        - name: Install helm Flannel CNI on first control plane node
+          when: inventory_hostname == groups[cp_group][0]
+          include_role: 
+            name: helm_install
+            tasks_from: helm_install_flannel
+
+#        - name: Install helm Calico CNI on first control plane node
+#          when: inventory_hostname == groups[cp_group][0]
+#          include_role: 
+#            name: helm_install
+#            tasks_from: helm_install_calico
+
+        #ansible logging feature?????
+        - name: Update status of first control plane node
+          when: inventory_hostname == groups[cp_group][0] and (cni_up['resources'] | length > 0)
+          lineinfile:
+            path: "{{ status_file }}"
+            line: "cni_up"
+          delegate_to: localhost
+
+        - name: Join other control plane nodes to cluster
+          when: inventory_hostname in groups[cp_group] and inventory_hostname != groups[cp_group][0]
+          include_role:
+            name: k8_mgmt
+            tasks_from: join_cluster.yml
+
+        - name: Apply node labels
+          when: inventory_hostname in groups[cp_group] and inventory_hostname != groups[cp_group][0]
+          include_role:
+            name: k8_mgmt
+            tasks_from: apply_node_labels.yml
+
+        - name: Setup profiles on control plane nodes
+          when: inventory_hostname in groups[cp_group] and inventory_hostname != groups[cp_group][0]
+          import_role: 
+            name: k8_mgmt
+            tasks_from: controlplane_profile_config
+
+        - name: All worker nodes waiting for control plane nodes to complete setup
+          when: inventory_hostname in groups[wk_group]
+          wait_for:
+            path: "{{ lock_file }}"
+            state: absent
+            timeout: 600
+          delegate_to: localhost
+        
+        - name: kubeadm token create join-command
+          when: inventory_hostname in groups[wk_group] 
+          command: kubeadm token create --print-join-command
+          changed_when: False
+          register: join_command
+          delegate_to: "{{ groups[cp_group][0] }}"
+
+        - name: Join worker nodes to cluster
+          when: inventory_hostname in groups[wk_group]
+          include_role:
+            name: k8_mgmt
+            tasks_from: join_cluster.yml
+          vars:
+            join_cluster_code: "{{ join_command['stdout'] }}"
+
+        - name: Apply node labels
+          when: inventory_hostname in groups[wk_group] 
+          include_role:
+            name: k8_mgmt
+            tasks_from: apply_node_labels.yml
+      rescue:
+        - name: Cleanup Lock file
+          when: inventory_hostname == groups[cp_group][0]
+          file:
+            path: "{{ lock_file }}"
+            state: absent
+          delegate_to: localhost
+
+        - name: Cleanup status file
+          when: inventory_hostname == groups[cp_group][0]
+          file:
+            path: "{{ status_file }}"
+            state: absent
+          delegate_to: localhost
+
+        - name: Cleanup status file
+          when: inventory_hostname == groups[cp_group][0]
+          file:
+            path: "{{ init_output }}"
+            state: absent
+          delegate_to: localhost
+
+      tags: 
+        - create_cluster
+        - never
+
+    - name: Install Cluster Supporting Config (Prometheus/New Relic)
+      block:
+        - name: Create namespace for F5 CIS
+          when: inventory_hostname == groups[cp_group][0]
+          vars:
+            k8_namespace: "{{ prometheus_namespace }}"
+          include_role: 
+            name: k8_app_mgmt
+            tasks_from: create_namespace
+
+        - name: Setup user account in kubernetes to F5
+          when: inventory_hostname == groups[cp_group][0]
+          vars:
+            generic_secret_name: "{{ newrelic_secret_name }}"
+            generic_secret_namespace: "{{ prometheus_namespace }}"
+            generic_secret_value: "{{ prometheus_newrelic_key }}"
+          include_role: 
+            name: k8_app_mgmt
+            tasks_from: create_generic_secret
+
+        - name: Install prometheus via helm charts
+          when: inventory_hostname == groups[cp_group][0]
+          include_role:
+            name: helm_install
+            tasks_from: helm_install_prometheus
+
+        - name: Install NewRelic via helm charts
+          when: inventory_hostname == groups[cp_group][0]
+          include_role:
+            name: helm_install
+            tasks_from: helm_install_newrelic
+
+      tags: 
+        - install_supporting_config_monitoring
+        - never
+
+    - name: Install Cluster Supporting Config (F5 integration)
+      block:
+        - name: Create namespace for F5 CIS
+          when: inventory_hostname == groups[cp_group][0]
+          vars:
+            k8_namespace: "{{ f5cis_namespace }}"
+          include_role: 
+            name: k8_app_mgmt
+            tasks_from: create_namespace
+        
+        - name: Setup user account in kubernetes to F5
+          when: inventory_hostname == groups[cp_group][0]
+          vars:
+            generic_secret_name: "{{ f5cis_secret_name }}"
+            generic_secret_namespace: "{{ f5cis_namespace }}"
+            generic_secret_user: "{{ F5_user }}"
+            generic_secret_password: "{{ F5_password }}"
+          include_role: 
+            name: k8_app_mgmt
+            tasks_from: create_generic_secret_username_password
+
+        - name: Install F5 via helm charts
+          when: inventory_hostname == groups[cp_group][0]
+          include_role:
+            name: helm_install
+            tasks_from: helm_install_f5cis
+      tags: 
+        - install_supporting_config_f5cis
+        - never
+
+#    - name: Install Cluster Supporting Config (F5 integration)
+#      block:
+#        - name: Install helm on first control plane node
+#          when: inventory_hostname == groups[cp_group][0]
+#          include_role:
+#            name: helm_install
+#            tasks_from: helm_install_calico
+#      tags: 
+#        - install_cni_calico
+#        - never
+

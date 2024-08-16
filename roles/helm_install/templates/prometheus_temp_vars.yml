@@ -1,0 +1,26 @@
+server:
+  persistentVolume:
+    ## If true, Prometheus server will create/use a Persistent Volume Claim
+    ## If false, use emptyDir
+    ##
+    enabled: false
+  emptyDir:
+    ## Prometheus server emptyDir volume size limit
+    ##
+    sizeLimit: 8Gi
+  remoteWrite:
+  - url: https://metric-api.newrelic.com/prometheus/v1/write?prometheus_server={{ prometheus_server_identity }}
+    bearer_token: {{ newrelic_license_key }}
+  #remote_write:
+  #- url: https://metric-api.newrelic.com/prometheus/v1/write?prometheus_server={{ prometheus_server_identity }}
+  #  authorization:
+  #    credentials: 
+  #      key: value
+  #      name: {{ newrelic_secret_name }}
+alertmanager:
+  persistence:
+    enabled: false
+  emptyDir:
+    ## Prometheus server emptyDir volume size limit
+    ##
+    size: 8Gi

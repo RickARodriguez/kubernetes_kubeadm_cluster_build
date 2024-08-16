@@ -7,6 +7,7 @@
     cmd: "{{ execute }}"
   loop:
     - kubeadm  init --control-plane-endpoint "{{ k8_api_server_url }}" --upload-certs --apiserver-bind-port {{ k8_api_server_bind_port }} --service-cidr {{ k8_service_cidr_network }} --pod-network-cidr {{ k8_pod_cidr_network }}
+    #- kubeadm  init --control-plane-endpoint "{{ k8_api_server_url }}" --upload-certs --apiserver-bind-port {{ k8_api_server_bind_port }} --pod-network-cidr {{ k8_pod_cidr_private_network }} --service-cidr {{ k8_service_cidr_network }}
   loop_control:
     loop_var: execute
   register: k8_initialize_output

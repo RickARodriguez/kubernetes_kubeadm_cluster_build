@@ -1,26 +1,61 @@
+appname: kubernetes
+vm_full_folder_path: "{{ k8_config_settings['vm_full_folder_path'][env] }}"
+vm_folder_name: "k8_cluster"
+major_dist: linux
+
+
+
+k8_config_settings:
+  vm_full_folder_path:
+    qa: "Non-Production/DMS/"
+    s9: "Infrastructure/"
+    qts: "Production/DMS/"
+
+#static files and settings
 k8_version: "v1.30"
-cp_group: "controlplane"
-wk_group: "worker"
+init_output: "files/k8/host_setup/init_output"
 status_file: "files/k8/host_setup/installation_progress"
 lock_file: "files/k8/host_setup/control_plane.lock"
 kube_config: "/etc/kubernetes/admin.conf"
 k8_kubeadm_install_version: "1.30.2-150500.1.1"
-k8_api_server_url: "{{ appsettings['api_server_vip'][env] }}"
-k8_api_server_bind_port: "{{ appsettings['api_server_bind_port'][env] }}"
-k8_pod_cidr_private_network: "{{ appsettings['pod_cidr_private_network'][env] }}"
-k8_worker_join_token: "{{ k8_secrets['worker_token'][env] }}"
-k8_worker_token_ca_cert_hash: "{{ k8_secrets['worker_token_ca_cert_hash'][env] }}"
 
+
+#cp_group: "{{ appsettings['kubernetes_controlplane_group'][env] }}"
+cp_group: "{{ appsettings['kubernetes_controlplane_group'][network][env] }}"
+wk_group: "{{ appsettings['kubernetes_worker_group'][network][env] }}"
+#k8_api_server_url: "{{ appsettings['api_server_vip'][env] }}:{{ appsettings['api_server_bind_port'][env] }}"
+k8_api_server_url: "{{ appsettings['api_server_vip'][network][env] }}:{{ appsettings['api_server_bind_port'][env] }}"
+#k8_api_server_url_short: "{{ appsettings['api_server_vip'][env] }}"
+k8_api_server_url_short: "{{ appsettings['api_server_vip'][network][env] }}"
+k8_api_server_bind_port: "{{ appsettings['api_server_bind_port'][env] }}"
+#k8_service_cidr_network: "{{ appsettings['service_cidr_network'][env] }}"
+k8_service_cidr_network: "{{ appsettings['service_cidr_network'][network][env] }}"
+#k8_cluster_name: "{{ appsettings['kubernetes_cluster_name'][env] }}"
+k8_cluster_name: "{{ appsettings['kubernetes_cluster_name'][network][env] }}"
+#commented out at the monment.  Was only used by calico helm definition
+k8_pod_cidr_network: "{{ appsettings['pod_cidr_network'][network][env] }}"
+#k8_pod_cidr_network: "{{ appsettings['pod_cidr_network'][env] }}"
+k8_pod_cidr_private_network: "{{ appsettings['pod_cidr_private_network'][env] }}"
+k8_pod_cidr_public_network: "{{ appsettings['pod_cidr_public_network'][env] }}"
+
+flannel_namespace: kube-flannel
+flannel_label_input: "--overwrite ns kube-flannel pod-security.kubernetes.io/enforce=privileged"
+
+#prometheus_server_identity: "{{ appsettings['prometheus_server_identity'][env] }}"
+prometheus_server_identity: "{{ appsettings['prometheus_server_identity'][network][env] }}"
+prometheus_newrelic_key: "{{ apis_secrets['newrelic']['license']['prometheus'] }}"
+prometheus_namespace: monitoring
+newrelic_secret_name: nr-license-key
+
+f5cis_secret_name: "f5-bigip-ctlr-login-{{ network }}"
+f5cis_namespace: "f5cis-system-{{ network }}"
+f5_env: "{{ dms_env }}_{{ network }}"
 
 #To read in dynamic vars this definition can not be included in appsettings
 file_movement:
   - src: "{{ appsettings['host_setup_files_dir'] }}/99-kubernetes-cri.conf"
     dest_dir: "/etc/sysctl.d/"
     filename: "99-kubernetes-cri.conf"
-    mode: 644
-  - src: "{{ appsettings['host_setup_files_dir'] }}/k8s.conf"
-    dest_dir: "/etc/sysctl.d/"
-    filename: "k8s.conf"
     mode: 644
   - src: "{{ appsettings['host_setup_files_dir'] }}/containerd.conf"
     dest_dir: "/etc/modules-load.d/"
@@ -51,7 +86,7 @@ file_movement:
     download: True
     owner: root
     group: root
-    auth_token: "{{ ansible_token }}"
+    auth_token: "{{ ansible_artifactory_token }}"
   - src: "{{ appsettings['host_download_dir'] }}"
     dest_dir: "/opt/cni/bin"
     filename: "cni-plugins-linux-amd64-v1.5.1.tgz"
@@ -63,7 +98,7 @@ file_movement:
     download: True
     owner: root
     group: root
-    auth_token: "{{ ansible_token }}"
+    auth_token: "{{ ansible_artifactory_token }}"
   - src: "{{ appsettings['host_download_dir'] }}"
     dest_dir: ""
     filename: "runc.amd64"
@@ -73,29 +108,108 @@ file_movement:
     download: True
     owner: root
     group: root
-    auth_token: "{{ ansible_token }}"
+    auth_token: "{{ ansible_artifactory_token }}"
 
 appsettings:
   host_setup_files_dir: "files/k8/host_setup"
   host_setup_template_dir: "templates/k8/host_setup"
   host_download_dir: "/tmp"
-  cni_plugin_url: https://ARTIFACT_SOURCE/k8_host_setup/cni-plugins-linux-amd64-v1.5.1.tgz
-  containerd_url: https://ARTIFACT_SOURCE/k8_host_setup/containerd-1.7.15-linux-amd64.tar.gz
-  runc_url: https://ARTIFACT_SOURCE/k8_host_setup/runc.amd64
+  cni_plugin_url: https://dmsartifactory.jfrog.io/artifactory/Ansible/k8_host_setup/cni-plugins-linux-amd64-v1.5.1.tgz
+  containerd_url: https://dmsartifactory.jfrog.io/artifactory/Ansible/k8_host_setup/containerd-1.7.15-linux-amd64.tar.gz
+  runc_url: https://dmsartifactory.jfrog.io/artifactory/Ansible/k8_host_setup/runc.amd64
   container_host_packages:
   - bash-completion
+  kubernetes_controlplane_group:
+    qa: "controlplane-priv"
+    dr: "controlplane-priv"
+    prod: "controlplane-priv"
+    pub:
+      qa: "controlplane-pub"
+      dr: "controlplane-pub"
+      prod: "controlplane-pub"
+    priv: 
+      qa: "controlplane-priv"
+      dr: "controlplane-priv"
+      prod: "controlplane-priv"
+  kubernetes_worker_group:
+    pub:
+      qa: "worker-pub"
+      dr: "worker-pub"
+      prod: "worker-pub"
+    priv: 
+      qa: "worker-priv"
+      dr: "worker-priv"
+      prod: "worker-priv"
+  kubernetes_cluster_name:
+    qa: np-k8-cluster
+    dr: dr-k8-cluster
+    prod: k8-cluster
+    pub:
+      qa: np-pub-k8-cluster
+      dr: dr-pub-k8-cluster
+      prod: pub-k8-cluster
+    priv: 
+      qa: np-priv-k8-cluster
+      dr: dr-priv-k8-cluster
+      prod: priv-k8-cluster
+  prometheus_server_identity:
+    qa: np-k8-prometheus-server
+    dr: dr-k8-prometheus-server
+    prod: k8-prometheus-server
+    pub:
+      qa: np-pub-k8-prometheus-server
+      dr: dr-pub-k8-prometheus-server
+      prod: pub-k8-prometheus-server
+    priv:
+      qa: np-priv-k8-prometheus-server
+      dr: dr-priv-k8-prometheus-server
+      prod: priv-k8-prometheus-server
   api_server_vip:
-    qa: qa-k8-controlplane.kube.com:443
-    pa: pa-k8-controlplane.kube.com:443
-    dr: k8-controlplane.kube.com:443
-    prod: k8-controlplane.kube.com:443
+    qa: qa-k8-controlplane.arkona.com
+    dr: k8-controlplane.arkona.com
+    prod: k8-controlplane.arkona.com
+    pub:
+      qa: qa-pub-k8-controlplane.arkona.com
+      dr: pub-k8-controlplane.arkona.com
+      prod: pub-k8-controlplane.arkona.com
+    priv:
+      qa: qa-priv-k8-controlplane.arkona.com
+      dr: priv-k8-controlplane.arkona.com
+      prod: priv-k8-controlplane.arkona.com
   api_server_bind_port:
     qa: 443
     pa: 443
     dr: 443
     prod: 443
+  pod_cidr_network:
+    qa: "10.244.0.0/15"
+    dr: "10.244.0.0/15"
+    prod: "10.244.0.0/15"
+    pub:
+      qa: "10.245.0.0/16"
+      dr: "10.245.0.0/16"
+      prod: "10.245.0.0/16"
+    priv:
+      qa: "10.244.0.0/16"
+      dr: "10.244.0.0/16"
+      prod: "10.244.0.0/16"
+  pod_cidr_public_network:
+      qa: "10.245.0.0/16"
+      dr: "10.245.0.0/16"
+      prod: "10.245.0.0/16"
   pod_cidr_private_network:
-    qa: "10.244.0.0/16"
-    pa: "10.244.0.0/16"
-    dr: "10.244.0.0/16"
-    prod: "10.244.0.0/16"
+      qa: "10.244.0.0/16"
+      dr: "10.244.0.0/16"
+      prod: "10.244.0.0/16"
+  service_cidr_network:
+    qa: "10.96.0.0/16"
+    dr: "10.96.0.0/16"
+    prod: "10.96.0.0/16"
+    pub:
+      qa: "10.97.0.0/16"
+      dr: "10.97.0.0/16"
+      prod: "10.97.0.0/16"
+    priv:
+      qa: "10.96.0.0/16"
+      dr: "10.96.0.0/16"
+      prod: "10.96.0.0/16"
