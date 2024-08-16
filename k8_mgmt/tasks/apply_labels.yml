@@ -1,8 +1,0 @@
----
-- name: Apply label
-  become: True
-  shell:
-    cmd: "kubectl label {{ label_input }}"
-  tags:
-    - k8_install
-  delegate_to: "{{ groups[cp_group][0] }}"
