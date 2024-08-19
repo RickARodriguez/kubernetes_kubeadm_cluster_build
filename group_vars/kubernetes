@@ -7,9 +7,9 @@ major_dist: linux
 
 k8_config_settings:
   vm_full_folder_path:
-    qa: "Non-Production/DMS/"
+    qa: "Non-Production/"
     s9: "Infrastructure/"
-    qts: "Production/DMS/"
+    qts: "Production/"
 
 #static files and settings
 k8_version: "v1.30"
@@ -49,7 +49,7 @@ newrelic_secret_name: nr-license-key
 
 f5cis_secret_name: "f5-bigip-ctlr-login-{{ network }}"
 f5cis_namespace: "f5cis-system-{{ network }}"
-f5_env: "{{ dms_env }}_{{ network }}"
+f5_env: "{{ env }}_{{ network }}"
 
 #To read in dynamic vars this definition can not be included in appsettings
 file_movement:
@@ -114,9 +114,9 @@ appsettings:
   host_setup_files_dir: "files/k8/host_setup"
   host_setup_template_dir: "templates/k8/host_setup"
   host_download_dir: "/tmp"
-  cni_plugin_url: https://dmsartifactory.jfrog.io/artifactory/Ansible/k8_host_setup/cni-plugins-linux-amd64-v1.5.1.tgz
-  containerd_url: https://dmsartifactory.jfrog.io/artifactory/Ansible/k8_host_setup/containerd-1.7.15-linux-amd64.tar.gz
-  runc_url: https://dmsartifactory.jfrog.io/artifactory/Ansible/k8_host_setup/runc.amd64
+  cni_plugin_url: https://somesite.com/artifactory/Ansible/k8_host_setup/cni-plugins-linux-amd64-v1.5.1.tgz
+  containerd_url: https://somesite.com/artifactory/Ansible/k8_host_setup/containerd-1.7.15-linux-amd64.tar.gz
+  runc_url: https://somesite.com/artifactory/Ansible/k8_host_setup/runc.amd64
   container_host_packages:
   - bash-completion
   kubernetes_controlplane_group:
@@ -165,17 +165,17 @@ appsettings:
       dr: dr-priv-k8-prometheus-server
       prod: priv-k8-prometheus-server
   api_server_vip:
-    qa: qa-k8-controlplane.arkona.com
-    dr: k8-controlplane.arkona.com
-    prod: k8-controlplane.arkona.com
+    qa: qa-k8-controlplane.somesite.com
+    dr: k8-controlplane.somesite.com
+    prod: k8-controlplane.somesite.com
     pub:
-      qa: qa-pub-k8-controlplane.arkona.com
-      dr: pub-k8-controlplane.arkona.com
-      prod: pub-k8-controlplane.arkona.com
+      qa: qa-pub-k8-controlplane.somesite.com
+      dr: pub-k8-controlplane.somesite.com
+      prod: pub-k8-controlplane.somesite.com
     priv:
-      qa: qa-priv-k8-controlplane.arkona.com
-      dr: priv-k8-controlplane.arkona.com
-      prod: priv-k8-controlplane.arkona.com
+      qa: qa-priv-k8-controlplane.somesite.com
+      dr: priv-k8-controlplane.somesite.com
+      prod: priv-k8-controlplane.somesite.com
   api_server_bind_port:
     qa: 443
     pa: 443
